@@ -56,7 +56,7 @@ client.on("messageCreate", async (message) => {
     .setDescription(
       `**Ödül:** ${ödül}\n**Kazanan Sayısı:** ${kazananSayısı}\n**Süre:** ${süre}\n\nKatılmak için aşağıdaki butona tıkla!`
     )
-    .setColor(null)
+    .setColor(0x00aeff)
     .setTimestamp();
 
   const row = new ActionRowBuilder().addComponents(
@@ -71,7 +71,7 @@ client.on("messageCreate", async (message) => {
   giveawayData.set(msg.id, {
     entrants: new Set(),
     prize: ödül,
-    winners: kazananSayısı,
+    winners: parseInt(kazananSayısı),
     endTime: Date.now() + süreMS,
   });
 
@@ -95,7 +95,7 @@ client.on("messageCreate", async (message) => {
       .setDescription(
         `**Ödül:** ${data.prize}\n**Kazanan(lar):** ${winners.join(", ")}`
       )
-      .setColor(null);
+      .setColor(0x00aeff);
 
     await message.channel.send({ embeds: [winEmbed] });
     giveawayData.delete(msg.id);
@@ -126,6 +126,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     data.entrants.add(interaction.user.id);
 
+    const toplam = data.entrants.size;
+    const kazananSayısı = data.winners;
+    const sans = ((kazananSayısı / toplam) * 100).toFixed(2);
+
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`leave_${interaction.message.id}`)
@@ -136,8 +140,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
     interaction.reply({
       content: [
         `> 🎉 **Çekilişe katıldınız!**`,
-        `> 💫 Kazanma şansınız: **1 / ${data.entrants.size}**`,
-        `> 👥 Çekilişe Katılan kişi sayısı: **${data.entrants.size}**`,
+        `> 💫 Kazanma şansınız: **%${sans}**`,
+        `> 👥 Katılan kişi sayısı: **${toplam}**`,
         `> Çekilişten ayrılmak için aşağıdaki butona basınız.`,
       ].join("\n"),
       components: [row],
@@ -196,7 +200,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       1,
       Math.min(5, parseInt(interaction.fields.getTextInputValue("yildiz_sayi")) || 1)
     );
-    const yıldızMetin = "⚡".repeat(yıldız);
+    const yıldızMetin = "⭐".repeat(yıldız);
 
     const kanal = interaction.guild.channels.cache.get(process.env.YORUM_KANAL);
     if (!kanal)
@@ -210,11 +214,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
       .setDescription(`${yıldızMetin}\n${yorum}`)
       .setImage("https://media.tenor.com/TH8g8YapAMIAAAAC/thor.gif")
       .setFooter({ text: "RevalOWO Systems." })
-      .setColor(null);
+      .setColor(0x00aeff);
 
     await kanal.send({ embeds: [embed] });
 
-    // yorum kanalı mesajını sıfırla
+    // Yorum ana mesajını yeniden gönder
     const reviewEmbed = new EmbedBuilder()
       .setImage(
         "https://media.tenor.com/7_Xo_VZr7M8AAAAC/zay-flowers-baltimore-ravens-touchdown-playoffs.gif"
@@ -222,7 +226,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       .setDescription(
         "Bizi Yorumlamak istermisin?\nAşağıdaki butona tıklayarak yorumunu bırak!"
       )
-      .setColor(null);
+      .setColor(0x00aeff);
 
     const reviewButton = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
@@ -233,7 +237,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     await kanal.send({ embeds: [reviewEmbed], components: [reviewButton] });
 
-    // 🔧 Hata düzeltmesi: deferUpdate() + ayrı ephemeral yanıt
     await interaction.deferUpdate().catch(() => {});
     await interaction.followUp({
       content: "> ✅ Yorumun gönderildi!",
@@ -257,7 +260,7 @@ client.on("messageCreate", async (message) => {
     .setDescription(
       "Bizi Yorumlamak istermisin?\nAşağıdaki butona tıklayarak yorumunu bırak!"
     )
-    .setColor(null);
+    .setColor(0x00aeff);
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
