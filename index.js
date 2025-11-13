@@ -7,12 +7,11 @@ const client = new Client({
     partials: [Partials.Channel]
 });
 
-const yorumKanaliID = process.env.YORUM_KANALI; // Yorum kanalı ID
+const yorumKanaliID = process.env.YORUM_KANALI;
 const PREFIX_CEKILIS = '.ck';
 const PREFIX_YORUM = '.yorum';
 
-// Geçici veri saklama
-let cekilisler = {}; // { messageId: {odul, kazananSayisi, katilan: []} }
+let cekilisler = {};
 
 client.on('ready', () => {
     console.log(`${client.user.tag} giriş yaptı!`);
@@ -20,21 +19,20 @@ client.on('ready', () => {
 
 client.on('messageCreate', async (message) => {
     if (!message.guild || message.author.bot) return;
-    if (message.author.id !== message.guild.ownerId) return; // Sadece sunucu sahibi
+    if (message.author.id !== message.guild.ownerId) return;
 
-    // ------------------ Çekiliş Başlat ------------------
+    // ---------------- Çekiliş ----------------
     if (message.content.startsWith(PREFIX_CEKILIS)) {
         const args = message.content.slice(PREFIX_CEKILIS.length).trim().split(' ');
         if (args.length < 3) return message.reply('Doğru kullanım: `.ck Süre(d/g/s) KazananSayısı Ödül`');
 
-        const sure = args[0]; // Örn: 5d, 10h, 30m
+        const sure = args[0];
         const kazananSayisi = parseInt(args[1]);
         const odul = args.slice(2).join(' ');
 
         const embed = new EmbedBuilder()
             .setTitle('🎉 ÇEKİLİŞ BAŞLADI!')
-            .setDescription(`Ödül: ${odul}\nKazanan Sayısı: ${kazananSayisi}\nSüre: ${sure}`)
-            .setColor('Blurple');
+            .setDescription(`Ödül: ${odul}\nKazanan Sayısı: ${kazananSayisi}\nSüre: ${sure}`);
 
         const buton = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -49,12 +47,11 @@ client.on('messageCreate', async (message) => {
         return;
     }
 
-    // ------------------ Yorum Başlat ------------------
+    // ---------------- Yorum Başlat ----------------
     if (message.content.startsWith(PREFIX_YORUM)) {
         const embed = new EmbedBuilder()
             .setTitle('Bizi Yorumlamak İster misin?')
             .setDescription('💬 Alıntıdan yorum yapabilirsiniz!')
-            .setImage('https://media.tenor.com/0fJtnAKh7bwAAAAC/zay-flowers-baltimore-ravens-touchdown.gif') // GIF direkt alıntı
             .setColor('Blurple');
 
         const buton = new ActionRowBuilder().addComponents(
@@ -64,16 +61,20 @@ client.on('messageCreate', async (message) => {
                 .setStyle(ButtonStyle.Primary)
         );
 
-        await message.channel.send({ embeds: [embed], components: [buton] });
+        // GIF direkt mesaj olarak gönderilecek
+        await message.channel.send({ embeds: [embed] });
+        await message.channel.send({ content: 'GIF: ', files: ['./gifs/zay-flowers.gif'] }); // GIF dosyasını localden ekle veya URL
+
+        await message.channel.send({ components: [buton] });
         return;
     }
 });
 
-// ------------------ Buton Etkileşimleri ------------------
+// ---------------- Button Interaction ----------------
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
 
-    // ------------------ Çekilişe Katıl ------------------
+    // Çekiliş Katılım
     if (interaction.customId === 'cekilis_katil') {
         const cekilis = cekilisler[interaction.message.id];
         if (!cekilis) return interaction.reply({ content: 'Bu çekiliş artık geçersiz.', ephemeral: true });
@@ -85,8 +86,7 @@ client.on('interactionCreate', async (interaction) => {
 
         const embed = new EmbedBuilder()
             .setTitle('Çekilişe Katıldınız!')
-            .setDescription(`Kazanma Şansınız: ${cekilis.kazananSayisi}\nÇekilişe Katılan Kişi Sayısı: ${cekilis.katilan.length}`)
-            .setColor('Blurple');
+            .setDescription(`Kazanma Şansınız: ${cekilis.kazananSayisi}\nÇekilişe Katılan Kişi Sayısı: ${cekilis.katilan.length}`);
 
         const ayrilButon = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -98,7 +98,7 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.reply({ embeds: [embed], components: [ayrilButon], ephemeral: true });
     }
 
-    // ------------------ Çekilişten Ayrıl ------------------
+    // Çekilişten Ayrıl
     if (interaction.customId.startsWith('cekilis_ayril_')) {
         const msgId = interaction.customId.split('_')[2];
         const cekilis = cekilisler[msgId];
@@ -114,7 +114,7 @@ client.on('interactionCreate', async (interaction) => {
         });
     }
 
-    // ------------------ Yorum Yap ------------------
+    // Yorum Yap
     if (interaction.customId === 'yorum_yap') {
         const modal = new ModalBuilder()
             .setCustomId('yorum_modal')
@@ -141,7 +141,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 });
 
-// ------------------ Modal Etkileşim ------------------
+// ---------------- Modal Submit ----------------
 client.on('interactionCreate', async (interaction) => {
     if (interaction.type !== InteractionType.ModalSubmit) return;
     if (interaction.customId !== 'yorum_modal') return;
@@ -153,7 +153,6 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle(`${interaction.user.username} Bir Yorum Yaptı!`)
         .setDescription(yorum)
         .addFields({ name: 'Yıldızlar', value: '⚡'.repeat(yildiz) })
-        .setImage('https://media.tenor.com/0hZMG6yXjPQAAAAC/thor.gif') // GIF direkt alıntı
         .setFooter({ text: 'RevalOWO systems.' })
         .setColor('Blurple');
 
@@ -162,7 +161,7 @@ client.on('interactionCreate', async (interaction) => {
 
     await interaction.reply({ content: 'Yorumunuz gönderildi!', ephemeral: true });
 
-    // Yorum yapma butonunu kanala geri ekle (her zaman en altta)
+    // Yorum butonunu her zaman en alta ekle
     const buton = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('yorum_yap')
