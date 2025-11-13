@@ -6,12 +6,10 @@ const {
   ButtonBuilder,
   ButtonStyle,
   Events,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
 } = require("discord.js");
-const ms = require("ms");
 require("dotenv").config();
+
+const ms = require("ms");
 
 const client = new Client({
   intents: [
@@ -35,7 +33,6 @@ client.once("ready", () => {
 //////////////////////
 client.on("messageCreate", async (message) => {
   if (!message.content.startsWith(".ck") || message.author.bot) return;
-
   if (message.author.id !== message.guild.ownerId)
     return message.reply("Bu komutu sadece sunucu sahibi kullanabilir!");
 
@@ -45,10 +42,7 @@ client.on("messageCreate", async (message) => {
     return message.reply("Kullanım: `.ck <Süre> <Kazanan Sayısı> <Ödül>`");
 
   const ödül = ödülArray.join(" ");
-  const süreMS = ms(
-    süre.replace("D", "d").replace("S", "h").replace("G", "m")
-  );
-
+  const süreMS = ms(süre.replace("D", "d").replace("S", "h").replace("G", "m"));
   if (!süreMS) return message.reply("Geçerli bir süre gir!");
 
   const embed = new EmbedBuilder()
@@ -56,7 +50,7 @@ client.on("messageCreate", async (message) => {
     .setDescription(
       `**Ödül:** ${ödül}\n**Kazanan Sayısı:** ${kazananSayısı}\n**Süre:** ${süre}\n\nKatılmak için aşağıdaki butona tıkla!`
     )
-    .setColor(0x00aeff)
+    .setColor(null)
     .setTimestamp();
 
   const row = new ActionRowBuilder().addComponents(
@@ -95,7 +89,7 @@ client.on("messageCreate", async (message) => {
       .setDescription(
         `**Ödül:** ${data.prize}\n**Kazanan(lar):** ${winners.join(", ")}`
       )
-      .setColor(0x00aeff);
+      .setColor(null);
 
     await message.channel.send({ embeds: [winEmbed] });
     giveawayData.delete(msg.id);
@@ -166,42 +160,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
     });
   }
 
-  //////////////////////
-  // YORUM SİSTEMİ
-  //////////////////////
+  // YORUM BUTONU
   if (interaction.customId === "make_review") {
-    const modal = new ModalBuilder()
-      .setCustomId("review_modal")
-      .setTitle("Yorum Yap");
-
-    const yorum = new TextInputBuilder()
-      .setCustomId("yorum_text")
-      .setLabel("Yorumunuz")
-      .setStyle(TextInputStyle.Paragraph)
-      .setRequired(true);
-
-    const yıldız = new TextInputBuilder()
-      .setCustomId("yildiz_sayi")
-      .setLabel("Kaç Yıldız? (1-5)")
-      .setStyle(TextInputStyle.Short)
-      .setRequired(true);
-
-    const row1 = new ActionRowBuilder().addComponents(yorum);
-    const row2 = new ActionRowBuilder().addComponents(yıldız);
-    modal.addComponents(row1, row2);
-
-    await interaction.showModal(modal);
-  }
-
-  // MODAL GÖNDERİLDİĞİNDE
-  if (interaction.isModalSubmit() && interaction.customId === "review_modal") {
-    const yorum = interaction.fields.getTextInputValue("yorum_text");
-    const yıldız = Math.max(
-      1,
-      Math.min(5, parseInt(interaction.fields.getTextInputValue("yildiz_sayi")) || 1)
-    );
-    const yıldızMetin = "⭐".repeat(yıldız);
-
     const kanal = interaction.guild.channels.cache.get(process.env.YORUM_KANAL);
     if (!kanal)
       return interaction.reply({
@@ -209,37 +169,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
         ephemeral: true,
       });
 
-    const embed = new EmbedBuilder()
-      .setTitle(`${interaction.user.username} Bir Yorum Yaptı!`)
-      .setDescription(`${yıldızMetin}\n${yorum}`)
-      .setImage("https://media.tenor.com/TH8g8YapAMIAAAAC/thor.gif")
-      .setFooter({ text: "RevalOWO Systems." })
-      .setColor(0x00aeff);
+    const mesaj = [
+      `> 🎉 **${interaction.user.username} Yorum Yapmak İstiyor!**`,
+      `> Lütfen aşağıdaki mesajın altına yorumunuzu yazın.`,
+      `> GIF: https://media.tenor.com/7_Xo_VZr7M8AAAAC/zay-flowers-baltimore-ravens-touchdown-playoffs.gif`
+    ].join("\n");
 
-    await kanal.send({ embeds: [embed] });
-
-    // Yorum ana mesajını yeniden gönder
-    const reviewEmbed = new EmbedBuilder()
-      .setImage(
-        "https://media.tenor.com/7_Xo_VZr7M8AAAAC/zay-flowers-baltimore-ravens-touchdown-playoffs.gif"
-      )
-      .setDescription(
-        "Bizi Yorumlamak istermisin?\nAşağıdaki butona tıklayarak yorumunu bırak!"
-      )
-      .setColor(0x00aeff);
-
-    const reviewButton = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId("make_review")
-        .setLabel("Yorum Yap")
-        .setStyle(ButtonStyle.Primary)
-    );
-
-    await kanal.send({ embeds: [reviewEmbed], components: [reviewButton] });
-
-    await interaction.deferUpdate().catch(() => {});
-    await interaction.followUp({
-      content: "> ✅ Yorumun gönderildi!",
+    await kanal.send({ content: mesaj });
+    await interaction.reply({
+      content: "> ✅ Yorum mesajınız gönderildi!",
       ephemeral: true,
     });
   }
@@ -253,14 +191,14 @@ client.on("messageCreate", async (message) => {
   if (message.author.id !== message.guild.ownerId)
     return message.reply("Bu komutu sadece sunucu sahibi kullanabilir!");
 
-  const embed = new EmbedBuilder()
-    .setImage(
-      "https://media.tenor.com/7_Xo_VZr7M8AAAAC/zay-flowers-baltimore-ravens-touchdown-playoffs.gif"
-    )
-    .setDescription(
-      "Bizi Yorumlamak istermisin?\nAşağıdaki butona tıklayarak yorumunu bırak!"
-    )
-    .setColor(0x00aeff);
+  const kanal = message.guild.channels.cache.get(process.env.YORUM_KANAL);
+  if (!kanal) return;
+
+  const mesaj = [
+    `> 🎉 **Bizi Yorumlamak İster misiniz?**`,
+    `> Aşağıdaki butona tıklayarak yorumunuzu bırakabilirsiniz.`,
+    `> GIF: https://media.tenor.com/7_Xo_VZr7M8AAAAC/zay-flowers-baltimore-ravens-touchdown-playoffs.gif`
+  ].join("\n");
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -269,7 +207,5 @@ client.on("messageCreate", async (message) => {
       .setStyle(ButtonStyle.Primary)
   );
 
-  message.guild.channels.cache
-    .get(process.env.YORUM_KANAL)
-    ?.send({ embeds: [embed], components: [row] });
+  kanal.send({ content: mesaj, components: [row] });
 });
