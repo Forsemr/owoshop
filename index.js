@@ -22,11 +22,8 @@ const client = new Client({
   ],
 });
 
-const giveawayData = new Map(); // { messageId: { entrants: Set, prize, winners, endTime } }
+const giveawayData = new Map();
 
-//////////////////////
-// BOT TOKEN
-//////////////////////
 client.login(process.env.TOKEN);
 
 client.once("ready", () => {
@@ -34,7 +31,7 @@ client.once("ready", () => {
 });
 
 //////////////////////
-// ÇEKİLİŞ KOMUTU (.ck)
+// .CK KOMUTU
 //////////////////////
 client.on("messageCreate", async (message) => {
   if (!message.content.startsWith(".ck") || message.author.bot) return;
@@ -235,7 +232,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
     );
 
     await kanal.send({ embeds: [reviewEmbed], components: [reviewButton] });
-    await interaction.reply({
+
+    // 🔧 Hata düzeltmesi: deferUpdate() + ayrı ephemeral yanıt
+    await interaction.deferUpdate().catch(() => {});
+    await interaction.followUp({
       content: "> ✅ Yorumun gönderildi!",
       ephemeral: true,
     });
@@ -243,7 +243,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 //////////////////////
-// .yorum KOMUTU
+// .YORUM KOMUTU
 //////////////////////
 client.on("messageCreate", async (message) => {
   if (!message.content.startsWith(".yorum") || message.author.bot) return;
