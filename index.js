@@ -7,7 +7,11 @@ const client = new Client({
     partials: [Partials.Channel]
 });
 
+// .env dosyanda kesin tanımlı olmalı
+// YORUM_KANALI=kanal_id
 const yorumKanaliID = process.env.YORUM_KANALI;
+if (!yorumKanaliID) throw new Error('YORUM_KANALI env değişkeni tanımlı değil!');
+
 const PREFIX_CEKILIS = '.ck';
 const PREFIX_YORUM = '.yorum';
 
@@ -61,11 +65,7 @@ client.on('messageCreate', async (message) => {
                 .setStyle(ButtonStyle.Primary)
         );
 
-        // GIF direkt mesaj olarak gönderilecek
-        await message.channel.send({ embeds: [embed] });
-        await message.channel.send({ content: 'GIF: ', files: ['./gifs/zay-flowers.gif'] }); // GIF dosyasını localden ekle veya URL
-
-        await message.channel.send({ components: [buton] });
+        await message.channel.send({ embeds: [embed], components: [buton] });
         return;
     }
 });
