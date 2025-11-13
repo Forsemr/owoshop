@@ -1,225 +1,173 @@
-const { 
-  Client, GatewayIntentBits, EmbedBuilder, 
-  ActionRowBuilder, ButtonBuilder, ButtonStyle, 
-  Events, ModalBuilder, TextInputBuilder, TextInputStyle 
-} = require("discord.js");
-require("dotenv").config();
-const ms = require("ms");
+// index.js
+const { Client, GatewayIntentBits, Partials, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, StringSelectMenuBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, InteractionType } = require('discord.js');
+require('dotenv').config();
 
-const giveawayData = new Map();
-
-//////////////////////
-// .CK KOMUTU
-//////////////////////
-const setupCK = (client) => {
-  client.on("messageCreate", async (message) => {
-    if (!message.content.startsWith(".ck") || message.author.bot) return;
-    if (message.author.id !== message.guild.ownerId)
-      return message.reply("Bu komutu sadece sunucu sahibi kullanabilir!");
-
-    const args = message.content.split(" ").slice(1);
-    const [süre, kazananSayısı, ...ödülArray] = args;
-    if (!süre || !kazananSayısı || ödülArray.length === 0)
-      return message.reply("Kullanım: `.ck <Süre> <Kazanan Sayısı> <Ödül>`");
-
-    const ödül = ödülArray.join(" ");
-    const süreMS = ms(süre.replace("D","d").replace("S","h").replace("G","m"));
-    if (!süreMS) return message.reply("Geçerli bir süre gir!");
-
-    const embed = new EmbedBuilder()
-      .setTitle("🎉 Çekiliş Başladı!")
-      .setDescription(`**Ödül:** ${ödül}\n**Kazanan Sayısı:** ${kazananSayısı}\n**Süre:** ${süre}\n\nKatılmak için aşağıdaki butona tıkla!`)
-      .setColor(null)
-      .setTimestamp();
-
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId("join_giveaway")
-        .setLabel("🎉 Katıl")
-        .setStyle(ButtonStyle.Primary)
-    );
-
-    const msg = await message.channel.send({ embeds: [embed], components: [row] });
-
-    giveawayData.set(msg.id, {
-      entrants: new Set(),
-      prize: ödül,
-      winners: parseInt(kazananSayısı),
-      endTime: Date.now() + süreMS
-    });
-
-    setTimeout(async () => {
-      const data = giveawayData.get(msg.id);
-      if (!data) return;
-      const katilanlar = Array.from(data.entrants);
-      if (katilanlar.length === 0) return message.channel.send(`Kimse çekilişe katılmadı!`);
-
-      const winners = [];
-      for (let i = 0; i < Math.min(katilanlar.length, data.winners); i++) {
-        const winner = katilanlar.splice(Math.floor(Math.random()*katilanlar.length),1)[0];
-        winners.push(`<@${winner}>`);
-      }
-
-      const winEmbed = new EmbedBuilder()
-        .setTitle("🎉 Çekiliş Bitti!")
-        .setDescription(`**Ödül:** ${data.prize}\n**Kazanan(lar):** ${winners.join(", ")}`)
-        .setColor(null);
-
-      await message.channel.send({ embeds: [winEmbed] });
-      giveawayData.delete(msg.id);
-    }, süreMS);
-  });
-};
-
-//////////////////////
-// BUTONLAR & INTERACTIONS
-//////////////////////
-const setupButtons = (client) => {
-  client.on(Events.InteractionCreate, async (interaction) => {
-    if (!interaction.isButton() && !interaction.isModalSubmit()) return;
-
-    // ÇEKİLİŞ KATIL
-    if (interaction.isButton() && interaction.customId === "join_giveaway") {
-      const data = giveawayData.get(interaction.message.id);
-      if (!data) return interaction.reply({ content: "> Bu çekiliş artık aktif değil.", ephemeral: true });
-
-      if (data.entrants.has(interaction.user.id)) 
-        return interaction.reply({ content: "> Zaten çekilişe katılmışsın.", ephemeral: true });
-
-      data.entrants.add(interaction.user.id);
-      const toplam = data.entrants.size;
-      const kazananSayısı = data.winners;
-      const sans = ((kazananSayısı / toplam)*100).toFixed(2);
-
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId(`leave_${interaction.message.id}`)
-          .setLabel("❌ Çekilişten Ayrıl")
-          .setStyle(ButtonStyle.Danger)
-      );
-
-      const alinti = [
-        `> 🎉 **Çekilişe katıldınız!**`,
-        `> 💫 Kazanma şansınız: **%${sans}**`,
-        `> 👥 Katılan kişi sayısı: **${toplam}**`,
-        `> Çekilişten ayrılmak için aşağıdaki butona basınız.`
-      ].join("\n");
-
-      interaction.reply({ content: alinti, components: [row], ephemeral: true });
-    }
-
-    // ÇEKİLİŞTEN AYRIL
-    if (interaction.isButton() && interaction.customId.startsWith("leave_")) {
-      const id = interaction.customId.split("_")[1];
-      const data = giveawayData.get(id);
-      if (!data) return interaction.reply({ content: "> Bu çekiliş artık aktif değil.", ephemeral: true });
-
-      data.entrants.delete(interaction.user.id);
-      interaction.reply({ content: "> ❌ Çekilişten ayrıldınız.", ephemeral: true });
-    }
-
-    // YORUM BUTONU: Modal aç
-    if (interaction.isButton() && interaction.customId === "make_review") {
-      const modal = new ModalBuilder()
-        .setCustomId("review_modal")
-        .setTitle("Yorum Yap");
-
-      const yorumInput = new TextInputBuilder()
-        .setCustomId("yorum_text")
-        .setLabel("Yorumunuz")
-        .setStyle(TextInputStyle.Paragraph)
-        .setRequired(true);
-
-      const starsInput = new TextInputBuilder()
-        .setCustomId("yorum_stars")
-        .setLabel("Kaç Yıldız? (1-5)")
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true);
-
-      const row1 = new ActionRowBuilder().addComponents(yorumInput);
-      const row2 = new ActionRowBuilder().addComponents(starsInput);
-      modal.addComponents(row1, row2);
-
-      await interaction.showModal(modal);
-    }
-
-    // Modal Submit
-    if (interaction.isModalSubmit() && interaction.customId === "review_modal") {
-      const yorum = interaction.fields.getTextInputValue("yorum_text");
-      const stars = parseInt(interaction.fields.getTextInputValue("yorum_stars"));
-      const kanal = interaction.guild.channels.cache.get(process.env.YORUM_KANAL);
-      if (!kanal) return interaction.reply({ content: "> Yorum kanalı bulunamadı!", ephemeral: true });
-
-      // Önceki yorum buton mesajını sil
-      kanal.messages.fetch({ limit: 10 }).then(msgs => {
-        const eskiButon = msgs.find(m => m.components.length > 0);
-        if (eskiButon) eskiButon.delete().catch(() => {});
-      });
-
-      const embed = new EmbedBuilder()
-        .setTitle(`${interaction.user.username} Bir Yorum Yaptı!`)
-        .setDescription(yorum)
-        .addFields({ name: "⭐ Yıldızlar", value: "⚡".repeat(stars) })
-        .setImage("https://media.tenor.com/21643627AAAAC/thor-gif.gif")
-        .setColor(null)
-        .setFooter({ text: "RevalOWO Systems." });
-
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId("make_review")
-          .setLabel("Yorum Yap")
-          .setStyle(ButtonStyle.Primary)
-      );
-
-      await kanal.send({ embeds: [embed], components: [row] });
-      await interaction.reply({ content: "> ✅ Yorumunuz gönderildi!", ephemeral: true });
-    }
-  });
-};
-
-//////////////////////
-// .YORUM KOMUTU
-//////////////////////
-const setupYorum = (client) => {
-  client.on("messageCreate", async (message) => {
-    if (!message.content.startsWith(".yorum") || message.author.bot) return;
-    if (message.author.id !== message.guild.ownerId) return message.reply("Bu komutu sadece sunucu sahibi kullanabilir!");
-
-    const kanal = message.guild.channels.cache.get(process.env.YORUM_KANAL);
-    if (!kanal) return;
-
-    const embed = new EmbedBuilder()
-      .setTitle("🎉 Bizi Yorumlamak İster misiniz?")
-      .setDescription("> Hemen aşağıdaki butona tıklayarak yorumunuzu bırakabilirsiniz!")
-      .setImage("https://media.tenor.com/7_Xo_VZr7M8AAAAC/zay-flowers-baltimore-ravens-touchdown-playoffs.gif")
-      .setColor(null)
-      .setFooter({ text: "RevalOWO Systems." });
-
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId("make_review")
-        .setLabel("Yorum Yap")
-        .setStyle(ButtonStyle.Primary)
-    );
-
-    kanal.send({ embeds: [embed], components: [row] });
-  });
-};
-
-//////////////////////
-// BOT LOGIN
-//////////////////////
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds, 
-    GatewayIntentBits.GuildMessages, 
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMembers
-  ]
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+    partials: [Partials.Channel]
 });
 
-setupCK(client);
-setupButtons(client);
-setupYorum(client);
+const yorumKanaliID = process.env.YORUM_KANALI; // Yorum kanalı ID
+const PREFIX_CEKILIS = '.ck';
+const PREFIX_YORUM = '.yorum';
+
+// Geçici veri saklama
+let cekilisler = {}; // { messageId: {odul, kazananSayisi, katilan: []} }
+
+client.on('ready', () => {
+    console.log(`${client.user.tag} giriş yaptı!`);
+});
+
+client.on('messageCreate', async (message) => {
+    if (!message.guild || message.author.bot) return;
+    if (message.author.id !== message.guild.ownerId) return; // Sadece sunucu sahibi
+
+    // ------------------ Çekiliş Başlat ------------------
+    if (message.content.startsWith(PREFIX_CEKILIS)) {
+        const args = message.content.slice(PREFIX_CEKILIS.length).trim().split(' ');
+        if (args.length < 3) return message.reply('Doğru kullanım: `.ck Süre(d/g/s) KazananSayısı Ödül`');
+
+        const sure = args[0]; // Örn: 5d, 10h, 30m
+        const kazananSayisi = parseInt(args[1]);
+        const odul = args.slice(2).join(' ');
+
+        const embed = new EmbedBuilder()
+            .setTitle('🎉 ÇEKİLİŞ BAŞLADI!')
+            .setDescription(`Ödül: ${odul}\nKazanan Sayısı: ${kazananSayisi}\nSüre: ${sure}`)
+            .setColor('Blurple');
+
+        const buton = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('cekilis_katil')
+                .setLabel('🎉 Katıl')
+                .setStyle(ButtonStyle.Primary)
+        );
+
+        const sentMessage = await message.channel.send({ embeds: [embed], components: [buton] });
+        cekilisler[sentMessage.id] = { odul, kazananSayisi, katilan: [] };
+
+        return;
+    }
+
+    // ------------------ Yorum Başlat ------------------
+    if (message.content.startsWith(PREFIX_YORUM)) {
+        const embed = new EmbedBuilder()
+            .setTitle('Bizi Yorumlamak İster misin?')
+            .setDescription('[GIF alıntı buraya gelecek](https://tenor.com/tr/view/zay-flowers-baltimore-ravens-touchdown-playoffs-gif-11848062941792005309)')
+            .setColor('Blurple');
+
+        const buton = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('yorum_yap')
+                .setLabel('Yorum Yap')
+                .setStyle(ButtonStyle.Primary)
+        );
+
+        await message.channel.send({ embeds: [embed], components: [buton] });
+        return;
+    }
+});
+
+// ------------------ Buton Etkileşimleri ------------------
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isButton()) return;
+
+    // ------------------ Çekilişe Katıl ------------------
+    if (interaction.customId === 'cekilis_katil') {
+        const cekilis = cekilisler[interaction.message.id];
+        if (!cekilis) return interaction.reply({ content: 'Bu çekiliş artık geçersiz.', ephemeral: true });
+
+        if (cekilis.katilan.includes(interaction.user.id))
+            return interaction.reply({ content: 'Zaten çekilişe katıldınız!', ephemeral: true });
+
+        cekilis.katilan.push(interaction.user.id);
+
+        const embed = new EmbedBuilder()
+            .setTitle('Çekilişe Katıldınız!')
+            .setDescription(`Kazanma Şansınız: ${cekilis.kazananSayisi}\nÇekilişe Katılan Kişi Sayısı: ${cekilis.katilan.length}`)
+            .setColor('Blurple');
+
+        const ayrilButon = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`cekilis_ayril_${interaction.message.id}`)
+                .setLabel('❌ Çekilişten Ayrıl')
+                .setStyle(ButtonStyle.Danger)
+        );
+
+        return interaction.reply({ embeds: [embed], components: [ayrilButon], ephemeral: true });
+    }
+
+    // ------------------ Çekilişten Ayrıl ------------------
+    if (interaction.customId.startsWith('cekilis_ayril_')) {
+        const msgId = interaction.customId.split('_')[2];
+        const cekilis = cekilisler[msgId];
+        if (!cekilis) return interaction.reply({ content: 'Bu çekiliş artık geçersiz.', ephemeral: true });
+
+        const index = cekilis.katilan.indexOf(interaction.user.id);
+        if (index !== -1) cekilis.katilan.splice(index, 1);
+
+        return interaction.update({
+            content: `!     A\n!     A\n!     A\n!     A\n!     A`,
+            embeds: [],
+            components: []
+        });
+    }
+
+    // ------------------ Yorum Yap ------------------
+    if (interaction.customId === 'yorum_yap') {
+        const modal = new ModalBuilder()
+            .setCustomId('yorum_modal')
+            .setTitle('Yorum Yap');
+
+        const yorumInput = new TextInputBuilder()
+            .setCustomId('yorum_text')
+            .setLabel('Yorumunuz')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true);
+
+        const yildizInput = new TextInputBuilder()
+            .setCustomId('yorum_yildiz')
+            .setLabel('Kaç Yıldız? (1-5)')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
+
+        const row1 = new ActionRowBuilder().addComponents(yorumInput);
+        const row2 = new ActionRowBuilder().addComponents(yildizInput);
+
+        modal.addComponents(row1, row2);
+
+        return interaction.showModal(modal);
+    }
+});
+
+// ------------------ Modal Etkileşim ------------------
+client.on('interactionCreate', async (interaction) => {
+    if (interaction.type !== InteractionType.ModalSubmit) return;
+    if (interaction.customId !== 'yorum_modal') return;
+
+    const yorum = interaction.fields.getTextInputValue('yorum_text');
+    const yildiz = parseInt(interaction.fields.getTextInputValue('yorum_yildiz'));
+
+    const embed = new EmbedBuilder()
+        .setTitle(`${interaction.user.username} Bir Yorum Yaptı!`)
+        .setDescription(yorum)
+        .addFields({ name: 'Yıldızlar', value: '⚡'.repeat(yildiz) })
+        .setImage('https://tenor.com/tr/view/thor-gif-21643627')
+        .setFooter({ text: 'RevalOWO systems.' });
+
+    const kanal = await client.channels.fetch(yorumKanaliID);
+    await kanal.send({ embeds: [embed] });
+
+    await interaction.reply({ content: 'Yorumunuz gönderildi!', ephemeral: true });
+
+    // Yorum yapma butonunu kanala geri ekle
+    const buton = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId('yorum_yap')
+            .setLabel('Yorum Yap')
+            .setStyle(ButtonStyle.Primary)
+    );
+    await kanal.send({ content: '💬 Yeni Yorum Yapmak İçin:', components: [buton] });
+});
 
 client.login(process.env.TOKEN);
