@@ -1,5 +1,5 @@
 // index.js
-const { Client, GatewayIntentBits, Partials, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, StringSelectMenuBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, InteractionType } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, InteractionType } = require('discord.js');
 require('dotenv').config();
 
 const client = new Client({
@@ -53,7 +53,8 @@ client.on('messageCreate', async (message) => {
     if (message.content.startsWith(PREFIX_YORUM)) {
         const embed = new EmbedBuilder()
             .setTitle('Bizi Yorumlamak İster misin?')
-            .setDescription('[GIF alıntı buraya gelecek](https://tenor.com/tr/view/zay-flowers-baltimore-ravens-touchdown-playoffs-gif-11848062941792005309)')
+            .setDescription('💬 Alıntıdan yorum yapabilirsiniz!')
+            .setImage('https://media.tenor.com/0fJtnAKh7bwAAAAC/zay-flowers-baltimore-ravens-touchdown.gif') // GIF direkt alıntı
             .setColor('Blurple');
 
         const buton = new ActionRowBuilder().addComponents(
@@ -152,15 +153,16 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle(`${interaction.user.username} Bir Yorum Yaptı!`)
         .setDescription(yorum)
         .addFields({ name: 'Yıldızlar', value: '⚡'.repeat(yildiz) })
-        .setImage('https://tenor.com/tr/view/thor-gif-21643627')
-        .setFooter({ text: 'RevalOWO systems.' });
+        .setImage('https://media.tenor.com/0hZMG6yXjPQAAAAC/thor.gif') // GIF direkt alıntı
+        .setFooter({ text: 'RevalOWO systems.' })
+        .setColor('Blurple');
 
     const kanal = await client.channels.fetch(yorumKanaliID);
     await kanal.send({ embeds: [embed] });
 
     await interaction.reply({ content: 'Yorumunuz gönderildi!', ephemeral: true });
 
-    // Yorum yapma butonunu kanala geri ekle
+    // Yorum yapma butonunu kanala geri ekle (her zaman en altta)
     const buton = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('yorum_yap')
