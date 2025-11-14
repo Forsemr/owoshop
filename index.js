@@ -1,14 +1,4 @@
-const {
-  Client,
-  GatewayIntentBits,
-  Events,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle
-} = require("discord.js");
+const { Client, GatewayIntentBits, Events, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder } = require("discord.js");
 require("dotenv").config();
 
 const client = new Client({
@@ -24,19 +14,17 @@ const client = new Client({
 //    BUTONLU METİN MESAJI   //
 // ========================= //
 
-function createYorumMesajText() {
-  return `>>> **Yorum Yap!**
-Yorum yaparak bize destek olmak ister misin?
-Aşağıdaki butona basarak yorumunu gönderebilirsin!
-
-${process.env.RESIM_LINK}
-`;
+function createYorumMesajEmbed() {
+  return new EmbedBuilder()
+    .setTitle("Yorum Yap!")
+    .setDescription("Yorum yaparak bize destek olmak ister misin?\nAşağıdaki butona basarak yorumunu gönderebilirsin!")
+    .setImage("https://raw.githubusercontent.com/Forsemr/owoshop/refs/heads/main/ChatGPT%20Image%2014%20Kas%202025%2021_09_19.png")
+    .setColor("Random");
 }
-
 
 async function sendYorumButton(channel) {
   await channel.send({
-    content: createYorumMesajText(),
+    embeds: [createYorumMesajEmbed()],
     components: [
       new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -56,7 +44,6 @@ client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
   if (msg.content !== ".yorum") return;
 
-  // sadece sunucu sahibi
   if (msg.author.id !== msg.guild.ownerId) {
     return msg.reply("🛑 Bu komutu sadece sunucu sahibi kullanabilir!");
   }
@@ -118,13 +105,11 @@ client.on(Events.InteractionCreate, async (i) => {
 
   const stars = "⚡".repeat(Math.min(Math.max(puan, 1), 5));
 
-  // eski butonu sil
   const msgs = await kanal.messages.fetch({ limit: 15 });
   msgs.forEach(m => {
     if (m.components.length > 0) m.delete().catch(() => {});
   });
 
-  // ALINTI FORMATLI YORUM
   const messageText =
 `>>> **${i.user.username} yorum yaptı!**
 \`\`\`
@@ -137,14 +122,12 @@ ${yorum}
 
   await kanal.send(messageText);
 
-  // ◀▶ YORUM ROLÜ VER
   const rolID = process.env.YORUM_ROL;
   try {
     const member = await kanal.guild.members.fetch(i.user.id);
     await member.roles.add(rolID).catch(() => {});
   } catch {}
 
-  // butonu tekrar en alta ekle
   await sendYorumButton(kanal);
 
   await i.reply({ content: "✔️ Yorumun gönderildi!", ephemeral: true });
