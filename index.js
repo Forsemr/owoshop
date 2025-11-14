@@ -15,7 +15,8 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers
   ]
 });
 
@@ -28,7 +29,7 @@ function createYorumMesajText() {
 Yorum yaparak bize destek olmak ister misin?
 Aşağıdaki butona basarak yorumunu gönderebilirsin!
 
-https://tenor.com/view/thor-power-lightning-charged-up-lets-do-this-gif-17857010
+https://ci3.googleusercontent.com/mail-img-att/AGAZnRolQOgg-ETFH7CKhvMt_ulw7WeDCHIvVtULaNWPq2UkCawM0RgB-xhvgSdcpxDU7-6YXlBcW505I5DZUfYhrl1B-7c7dryqrGT2Ks59hgZ8uMevukQDe0yb_cejVp8kqR0jDMvwxh9Nw4I01tWPT1tWrvZ7dlXsLk2Fcb7XuuDxKm1VQwsfwr-7P-5OZHfcSbdlP9g4vhschCPYOpgcFTcDnGnG7MWrCMBbWQ0hQBwxL7j5CeniHCeHSKZ_3QfEo7ZDeu35VnUFkYvtXDg1v0_CyFHQGO6PVStfPyteGzaPggV0_Mv4-XTPjDh9GtaBDNsNn_zNP-Hj0YnU4L702pHqT4tnirNI0sXO2-WUA3PPQJayZVcibiYIpMJ3B4UXWUy2FScJdGRcxSAmM2PbNp8J6udDzYdeN2jvzpJj66UnPXd3o_NzsPDse0TYOKbIy_O5OQv9wgQpRc-dqoIMMNdvvRCzXk3oFgUupVE_oligpxTrfBLfigJ-CRiUiCyyao33_1hl0cw-XEjrJRR4sqxvl_vg85RjB6tHmCaOBmgS3TIxPRkvJDwfBNbn10w_A_QJ2D4BYoKPhBu0abFSPRtWNa098E5hEk41s6znMOiVZ-NJH8Qmb76oJywiB0hyWmLifwyvbPauW1XNG8Z8XhOVb7X9BQyWtLC5wUSIsFtuQz0eRPqzmEME3sZY-iWi09ec-fDl_rBfJbpmpWKJfyvIIp_7qDQMc33uOjE3Mp6S03IoKhpx7tSU2t7Sme0VXJDu-7pLBsmTX_Lf5MNWcDX6HX5lnuyNoie5IrWICS7OJo3K9IXC45R4gt7QiubNcP09woODyqgnMc720Hctnlc7ZaYEOuZD9boI5yTwbE2d1sk67NHr9XmAYm94PgvLLy7ay_STxnjeM-i_k1hhULxcURYonnHrDAIQ-RkNd2L2vYqr3cr-ijVfUwAZJd825zOmM6yF-kgsjPDYNEID341wtMyY0mHSNQ68xryFAg53VaWZ2DLP8QTVs6wgyLSF3xe5cloDhZuuIp0hKzrvsv76GX54rEZGtgmGYluNf0IfBZftuA=s0-l75-ft
 `;
 }
 
@@ -116,11 +117,7 @@ client.on(Events.InteractionCreate, async (i) => {
 
   const stars = "⚡".repeat(Math.min(Math.max(puan, 1), 5));
 
-  const gif = puan <= 3
-    ? "https://tenor.com/view/anime-gif-wolf-edgy-dark-gif-11303854337102397742"
-    : "https://tenor.com/view/cat-catgame-cheer-cheering-dancing-gif-10148219265460740386";
-
-  // eski butonları sil
+  // eski butonu sil
   const msgs = await kanal.messages.fetch({ limit: 15 });
   msgs.forEach(m => {
     if (m.components.length > 0) m.delete().catch(() => {});
@@ -135,10 +132,16 @@ ${yorum}
 
 **Puan:**
 \`\`\`${stars}\`\`\`
-
-${gif}`;
+`;
 
   await kanal.send(messageText);
+
+  // ◀▶ YORUM ROLÜ VER
+  const rolID = process.env.YORUM_ROL;
+  try {
+    const member = await kanal.guild.members.fetch(i.user.id);
+    await member.roles.add(rolID).catch(() => {});
+  } catch {}
 
   // butonu tekrar en alta ekle
   await sendYorumButton(kanal);
