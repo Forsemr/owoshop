@@ -1,24 +1,29 @@
-const { 
-  Client, 
-  GatewayIntentBits, 
-  PermissionsBitField, 
-  EmbedBuilder, 
+const {
+  Client,
+  GatewayIntentBits,
+  EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
-  Events 
+  Events
 } = require("discord.js");
 require("dotenv").config();
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
+  ]
 });
 
-// ---- YORUM BUTONU OLUŞTURMA ----
-function createYorumButton() {
+// ========================= //
+//   YORUM BUTONU FONKSİYON  //
+// ========================= //
+function createButton() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("yorumForm")
@@ -27,41 +32,46 @@ function createYorumButton() {
   );
 }
 
-// ---- YORUM BUTON EMOJİLİ MESAJI ----
-function createYorumMesaj() {
+function createMainEmbed() {
   return new EmbedBuilder()
     .setTitle("Yorum Yap!")
     .setDescription(
-      "Yorum Yaparak Bize Destek Olmak İster misin?\n" +
-      "Aşağıdaki butonla hemen yorumunu bırak! 🔥\n\n" +
+      "Yorum yaparak bize destek olmak ister misin?\n" +
+      "Aşağıdaki butonla hemen yorumunu gönder!\n\n" +
       "https://tenor.com/view/thor-power-lightning-charged-up-lets-do-this-gif-17857010"
     )
     .setColor("Blue");
 }
 
-// ---- YORUM MESAJI ATMA ----
-async function sendYorumButton(channel) {
+async function sendButton(channel) {
   await channel.send({
-    embeds: [createYorumMesaj()],
-    components: [createYorumButton()]
+    embeds: [createMainEmbed()],
+    components: [createButton()]
   });
 }
 
-// ---- KOMUT .yorum ----
+// ========================= //
+//         .yorum            //
+// ========================= //
 client.on("messageCreate", async (msg) => {
+  if (msg.author.bot) return;
   if (msg.content !== ".yorum") return;
+
+  // sadece owner
   if (msg.author.id !== msg.guild.ownerId) {
-    return msg.reply("🛑 Bu komutu sadece sunucu sahibi kullanabilir!");
+    return msg.reply("Bu komutu sadece sunucu sahibi kullanabilir!");
   }
 
   const kanal = msg.guild.channels.cache.get(process.env.YORUM_KANAL);
-  if (!kanal) return msg.reply("Kanal bulunamadı!");
+  if (!kanal) return msg.reply("YORUM_KANAL ID yanlış!");
 
-  await sendYorumButton(kanal);
+  await sendButton(kanal);
   msg.reply("Yorum sistemi kuruldu! 🔥");
 });
 
-// ---- BUTON BASILDIĞINDA FORM ----
+// ========================= //
+//       BUTON → FORM        //
+// ========================= //
 client.on(Events.InteractionCreate, async (i) => {
   if (!i.isButton()) return;
   if (i.customId !== "yorumForm") return;
@@ -72,25 +82,27 @@ client.on(Events.InteractionCreate, async (i) => {
 
   const yorum = new TextInputBuilder()
     .setCustomId("yorumText")
-    .setLabel("1) Yorumunuz")
+    .setLabel("Yorumunuz")
     .setStyle(TextInputStyle.Paragraph)
     .setRequired(true);
 
   const puan = new TextInputBuilder()
     .setCustomId("puanText")
-    .setLabel("2) Kaç Yıldız Veriyorsunuz? (1-5)")
+    .setLabel("Kaç Yıldız? (1-5)")
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
 
-  const row1 = new ActionRowBuilder().addComponents(yorum);
-  const row2 = new ActionRowBuilder().addComponents(puan);
-
-  modal.addComponents(row1, row2);
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(yorum),
+    new ActionRowBuilder().addComponents(puan)
+  );
 
   await i.showModal(modal);
 });
 
-// ---- FORM GÖNDERİLDİĞİNDE ----
+// ========================= //
+//     FORM → YORUM ATMA     //
+// ========================= //
 client.on(Events.InteractionCreate, async (i) => {
   if (!i.isModalSubmit()) return;
   if (i.customId !== "yorumModal") return;
@@ -99,38 +111,41 @@ client.on(Events.InteractionCreate, async (i) => {
   const puan = Number(i.fields.getTextInputValue("puanText"));
   const kanal = i.guild.channels.cache.get(process.env.YORUM_KANAL);
 
-  if (!kanal) return;
-
-  // yıldız → ⚡ simgesiyle
-  const yıldız = "⚡".repeat(Math.min(Math.max(puan, 1), 5));
-
-  // uygun GIF
-  let gif;
-  if (puan <= 3) {
-    gif = "https://tenor.com/view/anime-gif-wolf-edgy-dark-gif-11303854337102397742";
-  } else {
-    gif = "https://tenor.com/view/cat-catgame-cheer-cheering-dancing-gif-10148219265460740386";
+  if (!kanal) {
+    return i.reply({ content: "Kanal bulunamadı!", ephemeral: true });
   }
 
-  // önce eski butonları sil
-  const msgs = await kanal.messages.fetch({ limit: 10 });
-  msgs.forEach(async (m) => {
-    if (m.components.length > 0) m.delete().catch(() => {});
+  // puan → ⚡
+  const stars = "⚡".repeat(Math.min(Math.max(puan, 1), 5));
+
+  // GIF seçimi
+  const gif = puan <= 3
+    ? "https://tenor.com/view/anime-gif-wolf-edgy-dark-gif-11303854337102397742"
+    : "https://tenor.com/view/cat-catgame-cheer-cheering-dancing-gif-10148219265460740386";
+
+  // eski butonları sil
+  const msgs = await kanal.messages.fetch({ limit: 15 });
+  msgs.forEach(m => {
+    if (m.components.length > 0) {
+      m.delete().catch(() => {});
+    }
   });
 
-  // yorum embed
+  // yorum gönder
   const embed = new EmbedBuilder()
-    .setTitle(`${i.user.username} Yorum Yaptı!`)
-    .setDescription(`\`\`\`${yorum}\`\`\`\n\n**Puan:**\n\`\`\`${yıldız}\`\`\`\n${gif}`)
-    .setColor("Random")
-    .setTimestamp();
+    .setTitle(`${i.user.username} yorum yaptı!`)
+    .setDescription(
+      `\`\`\`${yorum}\`\`\`\n` +
+      `**Puan:**\n\`\`\`${stars}\`\`\`\n${gif}`
+    )
+    .setColor("Random");
 
   await kanal.send({ embeds: [embed] });
 
-  // butonu tekrar alta ekle
-  await sendYorumButton(kanal);
+  // butonu en alta tekrar ekle
+  await sendButton(kanal);
 
-  await i.reply({ content: "Yorumun gönderildi! 💙", ephemeral: true });
+  await i.reply({ content: "Yorumun gönderildi!", ephemeral: true });
 });
 
 client.login(process.env.TOKEN);
