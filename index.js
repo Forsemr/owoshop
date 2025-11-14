@@ -1,174 +1,136 @@
-// index.js
-const { Client, GatewayIntentBits, Partials, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, InteractionType } = require('discord.js');
-require('dotenv').config();
+const { 
+  Client, 
+  GatewayIntentBits, 
+  PermissionsBitField, 
+  EmbedBuilder, 
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  Events 
+} = require("discord.js");
+require("dotenv").config();
 
 const client = new Client({
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
-    partials: [Partials.Channel]
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]
 });
 
-// .env dosyanda kesin tanımlı olmalı
-// YORUM_KANALI=kanal_id
-const yorumKanaliID = process.env.YORUM_KANALI;
-if (!yorumKanaliID) throw new Error('YORUM_KANALI env değişkeni tanımlı değil!');
+// ---- YORUM BUTONU OLUŞTURMA ----
+function createYorumButton() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("yorumForm")
+      .setLabel("Yorum Yap")
+      .setStyle(ButtonStyle.Primary)
+  );
+}
 
-const PREFIX_CEKILIS = '.ck';
-const PREFIX_YORUM = '.yorum';
+// ---- YORUM BUTON EMOJİLİ MESAJI ----
+function createYorumMesaj() {
+  return new EmbedBuilder()
+    .setTitle("Yorum Yap!")
+    .setDescription(
+      "Yorum Yaparak Bize Destek Olmak İster misin?\n" +
+      "Aşağıdaki butonla hemen yorumunu bırak! 🔥\n\n" +
+      "https://tenor.com/view/thor-power-lightning-charged-up-lets-do-this-gif-17857010"
+    )
+    .setColor("Blue");
+}
 
-let cekilisler = {};
+// ---- YORUM MESAJI ATMA ----
+async function sendYorumButton(channel) {
+  await channel.send({
+    embeds: [createYorumMesaj()],
+    components: [createYorumButton()]
+  });
+}
 
-client.on('ready', () => {
-    console.log(`${client.user.tag} giriş yaptı!`);
+// ---- KOMUT .yorum ----
+client.on("messageCreate", async (msg) => {
+  if (msg.content !== ".yorum") return;
+  if (msg.author.id !== msg.guild.ownerId) {
+    return msg.reply("🛑 Bu komutu sadece sunucu sahibi kullanabilir!");
+  }
+
+  const kanal = msg.guild.channels.cache.get(process.env.YORUM_KANAL);
+  if (!kanal) return msg.reply("Kanal bulunamadı!");
+
+  await sendYorumButton(kanal);
+  msg.reply("Yorum sistemi kuruldu! 🔥");
 });
 
-client.on('messageCreate', async (message) => {
-    if (!message.guild || message.author.bot) return;
-    if (message.author.id !== message.guild.ownerId) return;
+// ---- BUTON BASILDIĞINDA FORM ----
+client.on(Events.InteractionCreate, async (i) => {
+  if (!i.isButton()) return;
+  if (i.customId !== "yorumForm") return;
 
-    // ---------------- Çekiliş ----------------
-    if (message.content.startsWith(PREFIX_CEKILIS)) {
-        const args = message.content.slice(PREFIX_CEKILIS.length).trim().split(' ');
-        if (args.length < 3) return message.reply('Doğru kullanım: `.ck Süre(d/g/s) KazananSayısı Ödül`');
+  const modal = new ModalBuilder()
+    .setCustomId("yorumModal")
+    .setTitle("Yorum Formu");
 
-        const sure = args[0];
-        const kazananSayisi = parseInt(args[1]);
-        const odul = args.slice(2).join(' ');
+  const yorum = new TextInputBuilder()
+    .setCustomId("yorumText")
+    .setLabel("1) Yorumunuz")
+    .setStyle(TextInputStyle.Paragraph)
+    .setRequired(true);
 
-        const embed = new EmbedBuilder()
-            .setTitle('🎉 ÇEKİLİŞ BAŞLADI!')
-            .setDescription(`Ödül: ${odul}\nKazanan Sayısı: ${kazananSayisi}\nSüre: ${sure}`);
+  const puan = new TextInputBuilder()
+    .setCustomId("puanText")
+    .setLabel("2) Kaç Yıldız Veriyorsunuz? (1-5)")
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true);
 
-        const buton = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('cekilis_katil')
-                .setLabel('🎉 Katıl')
-                .setStyle(ButtonStyle.Primary)
-        );
+  const row1 = new ActionRowBuilder().addComponents(yorum);
+  const row2 = new ActionRowBuilder().addComponents(puan);
 
-        const sentMessage = await message.channel.send({ embeds: [embed], components: [buton] });
-        cekilisler[sentMessage.id] = { odul, kazananSayisi, katilan: [] };
+  modal.addComponents(row1, row2);
 
-        return;
-    }
-
-    // ---------------- Yorum Başlat ----------------
-    if (message.content.startsWith(PREFIX_YORUM)) {
-        const embed = new EmbedBuilder()
-            .setTitle('Bizi Yorumlamak İster misin?')
-            .setDescription('💬 Alıntıdan yorum yapabilirsiniz!')
-            .setColor('Blurple');
-
-        const buton = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('yorum_yap')
-                .setLabel('Yorum Yap')
-                .setStyle(ButtonStyle.Primary)
-        );
-
-        await message.channel.send({ embeds: [embed], components: [buton] });
-        return;
-    }
+  await i.showModal(modal);
 });
 
-// ---------------- Button Interaction ----------------
-client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isButton()) return;
+// ---- FORM GÖNDERİLDİĞİNDE ----
+client.on(Events.InteractionCreate, async (i) => {
+  if (!i.isModalSubmit()) return;
+  if (i.customId !== "yorumModal") return;
 
-    // Çekiliş Katılım
-    if (interaction.customId === 'cekilis_katil') {
-        const cekilis = cekilisler[interaction.message.id];
-        if (!cekilis) return interaction.reply({ content: 'Bu çekiliş artık geçersiz.', ephemeral: true });
+  const yorum = i.fields.getTextInputValue("yorumText");
+  const puan = Number(i.fields.getTextInputValue("puanText"));
+  const kanal = i.guild.channels.cache.get(process.env.YORUM_KANAL);
 
-        if (cekilis.katilan.includes(interaction.user.id))
-            return interaction.reply({ content: 'Zaten çekilişe katıldınız!', ephemeral: true });
+  if (!kanal) return;
 
-        cekilis.katilan.push(interaction.user.id);
+  // yıldız → ⚡ simgesiyle
+  const yıldız = "⚡".repeat(Math.min(Math.max(puan, 1), 5));
 
-        const embed = new EmbedBuilder()
-            .setTitle('Çekilişe Katıldınız!')
-            .setDescription(`Kazanma Şansınız: ${cekilis.kazananSayisi}\nÇekilişe Katılan Kişi Sayısı: ${cekilis.katilan.length}`);
+  // uygun GIF
+  let gif;
+  if (puan <= 3) {
+    gif = "https://tenor.com/view/anime-gif-wolf-edgy-dark-gif-11303854337102397742";
+  } else {
+    gif = "https://tenor.com/view/cat-catgame-cheer-cheering-dancing-gif-10148219265460740386";
+  }
 
-        const ayrilButon = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`cekilis_ayril_${interaction.message.id}`)
-                .setLabel('❌ Çekilişten Ayrıl')
-                .setStyle(ButtonStyle.Danger)
-        );
+  // önce eski butonları sil
+  const msgs = await kanal.messages.fetch({ limit: 10 });
+  msgs.forEach(async (m) => {
+    if (m.components.length > 0) m.delete().catch(() => {});
+  });
 
-        return interaction.reply({ embeds: [embed], components: [ayrilButon], ephemeral: true });
-    }
+  // yorum embed
+  const embed = new EmbedBuilder()
+    .setTitle(`${i.user.username} Yorum Yaptı!`)
+    .setDescription(`\`\`\`${yorum}\`\`\`\n\n**Puan:**\n\`\`\`${yıldız}\`\`\`\n${gif}`)
+    .setColor("Random")
+    .setTimestamp();
 
-    // Çekilişten Ayrıl
-    if (interaction.customId.startsWith('cekilis_ayril_')) {
-        const msgId = interaction.customId.split('_')[2];
-        const cekilis = cekilisler[msgId];
-        if (!cekilis) return interaction.reply({ content: 'Bu çekiliş artık geçersiz.', ephemeral: true });
+  await kanal.send({ embeds: [embed] });
 
-        const index = cekilis.katilan.indexOf(interaction.user.id);
-        if (index !== -1) cekilis.katilan.splice(index, 1);
+  // butonu tekrar alta ekle
+  await sendYorumButton(kanal);
 
-        return interaction.update({
-            content: `!     A\n!     A\n!     A\n!     A\n!     A`,
-            embeds: [],
-            components: []
-        });
-    }
-
-    // Yorum Yap
-    if (interaction.customId === 'yorum_yap') {
-        const modal = new ModalBuilder()
-            .setCustomId('yorum_modal')
-            .setTitle('Yorum Yap');
-
-        const yorumInput = new TextInputBuilder()
-            .setCustomId('yorum_text')
-            .setLabel('Yorumunuz')
-            .setStyle(TextInputStyle.Paragraph)
-            .setRequired(true);
-
-        const yildizInput = new TextInputBuilder()
-            .setCustomId('yorum_yildiz')
-            .setLabel('Kaç Yıldız? (1-5)')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true);
-
-        const row1 = new ActionRowBuilder().addComponents(yorumInput);
-        const row2 = new ActionRowBuilder().addComponents(yildizInput);
-
-        modal.addComponents(row1, row2);
-
-        return interaction.showModal(modal);
-    }
-});
-
-// ---------------- Modal Submit ----------------
-client.on('interactionCreate', async (interaction) => {
-    if (interaction.type !== InteractionType.ModalSubmit) return;
-    if (interaction.customId !== 'yorum_modal') return;
-
-    const yorum = interaction.fields.getTextInputValue('yorum_text');
-    const yildiz = parseInt(interaction.fields.getTextInputValue('yorum_yildiz'));
-
-    const embed = new EmbedBuilder()
-        .setTitle(`${interaction.user.username} Bir Yorum Yaptı!`)
-        .setDescription(yorum)
-        .addFields({ name: 'Yıldızlar', value: '⚡'.repeat(yildiz) })
-        .setFooter({ text: 'RevalOWO systems.' })
-        .setColor('Blurple');
-
-    const kanal = await client.channels.fetch(yorumKanaliID);
-    await kanal.send({ embeds: [embed] });
-
-    await interaction.reply({ content: 'Yorumunuz gönderildi!', ephemeral: true });
-
-    // Yorum butonunu her zaman en alta ekle
-    const buton = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId('yorum_yap')
-            .setLabel('Yorum Yap')
-            .setStyle(ButtonStyle.Primary)
-    );
-    await kanal.send({ content: '💬 Yeni Yorum Yapmak İçin:', components: [buton] });
+  await i.reply({ content: "Yorumun gönderildi! 💙", ephemeral: true });
 });
 
 client.login(process.env.TOKEN);
